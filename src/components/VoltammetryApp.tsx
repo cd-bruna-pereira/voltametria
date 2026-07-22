@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type * as PlotlyTypes from "plotly.js";
-import { Upload, Beaker, Trash2, RotateCcw, Download, Pencil, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { Upload, Beaker, RotateCcw, Download, Pencil, ArrowRight, ArrowLeft, Check } from "lucide-react";
 
 import { parseCsv, type SeriesPair, type ParsedCsv } from "@/lib/csv";
 import { detectPeaks, nearestIndex, recomputePeak, type Peak } from "@/lib/peaks";
@@ -102,13 +102,8 @@ export function VoltammetryApp() {
     setEdit(null);
   };
 
-  const deletePeak = (seriesIndex: number, peakId: string) => {
-    setPeaks((prev) => ({
-      ...prev,
-      [seriesIndex]: (prev[seriesIndex] ?? []).filter((p) => p.id !== peakId),
-    }));
-    if (edit?.peakId === peakId) setEdit(null);
-  };
+
+
 
   const handleChartClick = (seriesIndex: number, point: { x: number; y: number }) => {
     if (!edit || edit.seriesIndex !== seriesIndex) return;
@@ -303,15 +298,30 @@ export function VoltammetryApp() {
                     }
                     onStopEdit={() => setEdit(null)}
                     onReset={() => resetPeaks(pair.index)}
-                    onDelete={(peakId) => deletePeak(pair.index, peakId)}
                   />
 
                 ))}
             </section>
 
             {selected.length > 0 && (
-              <div className="flex justify-end">
-                <Button size="lg" onClick={() => setView("matrix")}>
+              <div className="flex flex-col items-end gap-2">
+                {edit && (
+                  <p className="text-xs text-destructive">
+                    Há uma edição de pico em andamento. Clique em "Concluir" antes de avançar.
+                  </p>
+                )}
+                <Button
+                  size="lg"
+                  onClick={() => {
+                    if (edit) {
+                      window.alert(
+                        "As edições de picos ainda não foram concluídas. Finalize clicando em \"Concluir\" antes de avançar.",
+                      );
+                      return;
+                    }
+                    setView("matrix");
+                  }}
+                >
                   Avançar <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -382,7 +392,6 @@ function IndividualChart({
   onStartEdit,
   onStopEdit,
   onReset,
-  onDelete,
 }: {
   pair: SeriesPair;
   peaks: Peak[];
@@ -391,7 +400,6 @@ function IndividualChart({
   onStartEdit: (peakId: string, step: "start" | "end") => void;
   onStopEdit: () => void;
   onReset: () => void;
-  onDelete: (peakId: string) => void;
 
 }) {
   const editingHere = edit?.seriesIndex === pair.index;
@@ -426,6 +434,16 @@ function IndividualChart({
         mode: "lines",
         line: { width: 0 },
         fillcolor: pk.kind === "anodic" ? ANODIC_FILL : CATHODIC_FILL,
+        hoverinfo: "skip",
+        showlegend: false,
+      });
+      // Contorno da curva do pico (segmento sobre a curva bruta) em vermelho/azul
+      traces.push({
+        x: xs,
+        y: ys,
+        mode: "lines",
+        type: "scatter",
+        line: { color: pk.kind === "anodic" ? ANODIC_COLOR : CATHODIC_COLOR, width: 2 },
         hoverinfo: "skip",
         showlegend: false,
       });
@@ -563,9 +581,6 @@ function IndividualChart({
                             title="Editar limites do pico"
                           >
                             <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => onDelete(p.id)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
                       </TableCell>
